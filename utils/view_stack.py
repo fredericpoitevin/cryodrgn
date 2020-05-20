@@ -5,13 +5,11 @@ import numpy as np
 import sys, os
 
 import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-sys.path.insert(0,'{}/../lib-python'.format(os.path.dirname(os.path.abspath(__file__))))
-import utils
-import mrc
-import analysis
+from cryodrgn import utils
+from cryodrgn import mrc
+from cryodrgn import analysis
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -20,7 +18,7 @@ def parse_args():
     return parser
 
 def main(args):
-    stack,_,_ = mrc.parse_mrc(args.input,lazy=True)
+    stack, _ = mrc.parse_mrc(args.input,lazy=True)
     print('{} {}x{} images'.format(len(stack), *stack[0].get().shape))
     stack = [stack[x].get() for x in range(9)]
     analysis.plot_projections(stack)

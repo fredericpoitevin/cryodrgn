@@ -14,12 +14,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
 
-sys.path.insert(0,'{}/../lib-python'.format(os.path.dirname(os.path.abspath(__file__))))
-import utils
-import mrc
-import fft
-import lie_tools
-import so3_grid
+from cryodrgn import utils
+from cryodrgn import mrc
+from cryodrgn import fft
+from cryodrgn import lie_tools
+from cryodrgn import so3_grid
 
 import matplotlib
 matplotlib.use('Agg')
@@ -102,7 +101,7 @@ class GridRot(data.Dataset):
     def __init__(self, resol):
         quats = so3_grid.grid_SO3(resol)
         self.rots = lie_tools.quaternions_to_SO3(torch.tensor(quats))
-        self.N = len(rots)
+        self.N = len(self.rots)
     def __len__(self):
         return self.N
     def __getitem__(self, index):
@@ -133,7 +132,7 @@ def translate_img(img, t):
     return np.fft.fftshift(np.fft.ifft2(ff)).real
 
 def main(args):
-    for out in (args.o, args.out_rot, args.out_png, args.out_trans):
+    for out in (args.o, args.out_png, args.out_pose):
         if not out: continue
         mkbasedir(out)
         warnexists(out)
@@ -153,7 +152,7 @@ def main(args):
         torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
     t1 = time.time()    
-    vol, _ , _ = mrc.parse_mrc(args.mrc)
+    vol, _ = mrc.parse_mrc(args.mrc)
     log('Loaded {} volume'.format(vol.shape))
 
     if args.tilt:
@@ -189,7 +188,7 @@ def main(args):
     log('Projected {} images in {}s ({}s per image)'.format(args.N, td, td/args.N ))
 
     if args.t_extent:
-        log('Shifting images between +/- {}'.format(args.t_extent))
+        log('Shifting images between +/- {} pixels'.format(args.t_extent))
         trans = np.random.rand(args.N,2)*2*args.t_extent - args.t_extent
         imgs = np.asarray([translate_img(img, t) for img,t in zip(imgs,trans)])
         # convention: we want the first column to be x shift and second column to be y shift
@@ -197,6 +196,10 @@ def main(args):
         # fourier_shift, which is flipped the other way
         # convention: save the translation that centers the image
         trans = -trans[:,::-1]
+        # convert translation from pixel to fraction
+        D = imgs.shape[-1]
+        assert D % 2 == 0
+        trans /= D
 
     log('Saving {}'.format(args.o))
     mrc.write(args.o,imgs.astype(np.float32))
